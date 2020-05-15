@@ -1,0 +1,26 @@
+## base dir
+# Working notes
+./*.txt
+
+## network_base
+# Object files
+./network_base/*.o
+./network_base/*.ko
+./network_base/*.obj
+./network_base/*.elf
+
+# Shared objects
+./network_base/*.so
+./network_base/*.so.*
+
+# Executables
+./network_base/*.out
+
+# Debug files
+./network_base/*.dSYM/
+./network_base/*.su
+./network_base/*.idb
+./network_base/*.pdb
+
+# Not including the project binaries
+./network_base/*.bin/
