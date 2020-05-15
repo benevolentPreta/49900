@@ -64,6 +64,11 @@ bool ipfs_command_decode_and_auth(char *buffer, const char *format, ipfs_recv_co
   {
     memset(recv_cmd->file_name, 0, sizeof(recv_cmd->file_name));
   }
+  DEBUGSS("Username", user->username);
+  DEBUGSS("Password", user->password);
+  DEBUGSS("Folder", recv_cmd->folder);
+  DEBUGSS("Filename", recv_cmd->file_name);
+
   return auth_ipfs_user(user, conf);
 }
 
@@ -79,6 +84,15 @@ void ipfs_command_accept(int socket, ipfs_conf_struct *conf)
   memset(temp_buffer, 0, sizeof(temp_buffer));
   memset(&ipfs_recv_command, 0, sizeof(ipfs_recv_command));
 
+  if ((ipfs_recv_command.user.username = (char *)malloc(MAXCHARBUFF * sizeof(char))) == NULL)
+  {
+    DEBUGSS("Failed to malloc", strerror(errno));
+  }
+  if ((ipfs_recv_command.user.password = (char *)malloc(MAXCHARBUFF * sizeof(char))) == NULL)
+  {
+    DEBUGSS("Failed to malloc", strerror(errno));
+  }
+
   user = &ipfs_recv_command.user;
 
   // receiving the command
@@ -90,15 +104,32 @@ void ipfs_command_accept(int socket, ipfs_conf_struct *conf)
   sscanf(buffer, GENERIC_TEMPATE, &ipfs_recv_command.flag, temp_buffer);
   flag = ipfs_recv_command.flag;
 
+  DEBUGS("Decoding and authentication command");
   // Handle case when Authentication Fails
   if (flag == LIST_FLAG)
+  {
+    DEBUGS("Command Received is LIST");
     auth_flag = ipfs_command_decode_and_auth(buffer, LIST_TEMPLATE, &ipfs_recv_command, conf);
+  }
   else if (flag == GET_FLAG)
+  {
+
+    DEBUGS("Command Received is GET");
     auth_flag = ipfs_command_decode_and_auth(buffer, GET_TEMPLATE, &ipfs_recv_command, conf);
+  }
   else if (flag == PUT_FLAG)
+  {
+
+    DEBUGS("Command Received is PUT");
     auth_flag = ipfs_command_decode_and_auth(buffer, PUT_TEMPLATE, &ipfs_recv_command, conf);
+  }
   else if (flag == MKDIR_FLAG)
+  {
+
+    DEBUGS("Command Received is MKDIR");
     auth_flag = ipfs_command_decode_and_auth(buffer, MKDIR_TEMPLATE, &ipfs_recv_command, conf);
+  }
+
   if (!auth_flag)
   {
     send_int_value_socket(socket, -1);
@@ -109,6 +140,8 @@ void ipfs_command_accept(int socket, ipfs_conf_struct *conf)
 
   free(ipfs_recv_command.user.username);
   free(ipfs_recv_command.user.password);
+
+  DEBUGS("Command Execution Done");
 }
 
 void send_error_helper(int socket, const char *message)
@@ -118,7 +151,10 @@ void send_error_helper(int socket, const char *message)
   u_char *payload;
 
   payload_size = strlen(message);
-
+  if ((payload = (u_char *)malloc(payload_size * sizeof(u_char))) == NULL)
+  {
+    DEBUGSS("Failed to malloc", strerror(errno));
+  }
   memcpy(payload, message, payload_size);
   send_int_value_socket(socket, payload_size);
   send_to_socket(socket, payload, payload_size);
@@ -144,6 +180,10 @@ void send_error(int socket, int flag)
   {
     send_error_helper(socket, AUTH_FAILED_ERROR);
   }
+  else
+  {
+    DEBUGS("Unknown Error Flag");
+  }
 }
 
 bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf_struct *conf, int flag)
@@ -164,7 +204,10 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
   len = sprintf(folder_path, "%s/%s", conf->server_name, recv_cmd->user.username);
 
   if (!check_directory_exists(folder_path))
+  {
+    DEBUGSS("Creating user directory:", folder_path);
     create_ipfs_directory(folder_path);
+  }
 
   // Since recv_cmd->folder ends with a '/' no need to add it in format
   len = sprintf(folder_path, "%s/%s/%s", conf->server_name, recv_cmd->user.username, recv_cmd->folder);
@@ -173,6 +216,8 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
   if (folder_path[len - 1] == ROOT_FOLDER_CHR && folder_path[len - 2] == ROOT_FOLDER_CHR)
     folder_path[--len] = NULL_CHAR;
 
+  DEBUGSS("Folder Path from Request", folder_path);
+
   // Check if folder path exists
   folder_path_flag = check_directory_exists(folder_path);
   if (flag == LIST_FLAG)
@@ -180,14 +225,17 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
     if (!folder_path_flag)
     {
+      DEBUGS("Folder path doesn't exist and sending back error message");
       send_int_value_socket(socket, -1);
       send_error(socket, FOLDER_NOT_FOUND);
       return false;
     }
 
     send_int_value_socket(socket, 1);
+    DEBUGS("Reading all the files in the folder path from request");
     get_files_in_folder(folder_path, &server_chunks_info, NULL);
 
+    DEBUGS("Sending files info to the client");
     // Estimate the size of payload to send
     size_of_payload = INT_SIZE + server_chunks_info.chunks * CHUNK_INFO_STRUCT_SIZE;
 
@@ -195,6 +243,10 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
     send_int_value_socket(socket, size_of_payload);
 
     // encoding server_chunks_info into u_char
+    if ((u_char_buffer = (u_char *)malloc(sizeof(u_char) * size_of_payload)) == NULL)
+    {
+      DEBUGSS("Failed to malloc", strerror(errno));
+    }
     memset(u_char_buffer, 0, size_of_payload * sizeof(u_char));
     encode_server_chunks_info_struct_to_buffer(u_char_buffer, &server_chunks_info);
 
@@ -215,27 +267,38 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
     if (!folder_path_flag)
     {
+      DEBUGS("Folder path doesn't exist and sending back error message");
       send_int_value_socket(socket, -1);
       send_error(socket, FOLDER_NOT_FOUND);
       return false;
     }
 
+    DEBUGS("Reading given file from folder path from request");
+
     // Handle case when file doesn't exists
     file_flag = get_files_in_folder(folder_path, &server_chunks_info, recv_cmd->file_name);
-    /*print_server_chunks_info_struct(&server_chunks_info);*/
+    print_server_chunks_info_struct(&server_chunks_info);
     if (!file_flag)
     {
+      DEBUGS("File doesn't exist and sending back error message");
       send_int_value_socket(socket, -1);
       send_error(socket, FILE_NOT_FOUND);
       return false;
     }
-    /*print_server_chunks_info_struct(&server_chunks_info);*/
+    print_server_chunks_info_struct(&server_chunks_info);
     // Estimate the size of payload to send
     size_of_payload = INT_SIZE + server_chunks_info.chunks * CHUNK_INFO_STRUCT_SIZE;
 
     send_int_value_socket(socket, 1);
+    DEBUGS("Sending the file's info to the client");
     // Sending the size of payload to expect
     send_int_value_socket(socket, size_of_payload);
+
+    // Encoding the server_chunks_info into buffer
+    if ((u_char_buffer = (u_char *)malloc(sizeof(u_char) * size_of_payload)) == NULL)
+    {
+      DEBUGSS("Failed to malloc", strerror(errno));
+    }
 
     memset(u_char_buffer, 0, size_of_payload * sizeof(u_char));
     encode_server_chunks_info_struct_to_buffer(u_char_buffer, &server_chunks_info);
@@ -244,6 +307,7 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
     send_to_socket(socket, u_char_buffer, size_of_payload);
     free(u_char_buffer);
 
+    DEBUGS("Waiting for signal from client");
     recv_signal(socket, &signal);
     free(server_chunks_info.chunk_info);
     if (signal == PROCEED_SIG)
@@ -251,17 +315,20 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
       // User wants to fetch the files
       // Possible that user requests for more than one chunk per server
 
+      DEBUGS("Proceeding with sending file split as requested by client");
       while (true)
       {
 
         // Recv the split id to send
         recv_int_value_socket(socket, &split_id);
+        DEBUGSN("Split #", split_id);
 
         sprintf(folder_path + len, ".%s.%d", recv_cmd->file_name, split_id);
+        DEBUGSS("Reading split from path", folder_path);
 
         splits->id = split_id;
         read_into_split_from_file(folder_path, &splits[0]);
-        /*print_split_struct(splits);*/
+        print_split_struct(splits);
         write_split_to_socket_as_stream(socket, splits);
         recv_signal(socket, &signal);
 
@@ -273,6 +340,7 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
     else
     {
 
+      DEBUGS("Client sent RESET SIG not proceeding");
       // Let the server exit stop the connections
     }
   }
@@ -281,12 +349,14 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
     if (!folder_path_flag)
     {
+      DEBUGS("Folder path doesn't exist and sending back error message");
       send_int_value_socket(socket, -1);
       send_error(socket, FOLDER_NOT_FOUND);
       return false;
     }
 
     send_int_value_socket(socket, 1);
+    DEBUGS("Reading splits from the socket and writing to the file path");
     for (i = 0; i < 2; i++)
     {
       // Checked if the path exits before executing the command
@@ -303,11 +373,13 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
     if (folder_path_flag)
     {
+      DEBUGS("Folder path already exists");
       send_int_value_socket(socket, -1);
       send_error(socket, FOLDER_EXISTS);
       return false;
     }
     send_int_value_socket(socket, 1);
+    DEBUGS("Creating director");
     create_ipfs_directory(folder_path);
   }
 
@@ -320,8 +392,12 @@ bool auth_ipfs_user(user_struct *user, ipfs_conf_struct *conf)
   for (i = 0; i < conf->user_count; i++)
   {
     if (compare_user_struct(user, conf->users[i]))
+    {
+      DEBUGSS("auth_ipfs_user: Authenticated", user->username);
       return true;
+    }
   }
+  DEBUGSS("Couldn't Authenticate", user->username);
   return false;
 }
 
@@ -332,7 +408,7 @@ void read_ipfs_conf(char *file_path, ipfs_conf_struct *conf)
   int line_len;
   if ((fp = fopen(file_path, "r")) <= 0)
   {
-    perror("DFC => Error in opening config file: ");
+    perror("IPFS_Client => Error in opening config file: ");
   }
 
   while (fgets(line, sizeof(line), fp))
