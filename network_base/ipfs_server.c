@@ -23,11 +23,13 @@ int main(int argc, char **argv)
   read_ipfs_conf(file_name, &conf);
   strcpy(conf.server_name, server_folder + 1);
   // Assumption that server_folder begins with a /
+  ipfs_directory_creator(++server_folder, &conf);
 
   listen_fd = get_ipfs_socket(port_number);
 
   while (true)
   {
+    DEBUGSS("Waiting to Accept Connection", server_folder);
     if ((conn_fd = accept(listen_fd, (struct sockaddr *)&remote_address, &addr_size)) <= 0)
     {
       perror("Error Accepting Connection");
@@ -42,10 +44,12 @@ int main(int argc, char **argv)
     }
     else
     {
+      DEBUGSN("In Child process", getpid());
       ipfs_command_accept(conn_fd, &conf);
       close(conn_fd);
       break;
     }
+    DEBUGS("Closed Connection, waiting to accept next");
   }
   free_ipfs_conf_struct(&conf);
   return 0;
