@@ -18,14 +18,13 @@ void setup_ipfs_client_to_dfs_connections(int** conn_fds, ipfs_client_conf_struc
 }
 
 void tear_ipfs_client_to_dfs_connections(int* conn_fds, ipfs_client_conf_struct* conf)
-
 {
   int i;
   for (i = 0; i < conf->server_count; i++) {
     if (conn_fds[i] == -1)
       continue;
     close(conn_fds[i]);
-    /*DEBUGSN("Disconnected from Server", i + 1);*/
+    DEBUGSN("Disconnected from Server", i + 1);
   }
 }
 bool create_ipfs_client_to_dfs_connections(int* conn_fds, ipfs_client_conf_struct* conf)
@@ -37,11 +36,11 @@ bool create_ipfs_client_to_dfs_connections(int* conn_fds, ipfs_client_conf_struc
   for (i = 0; i < conf->server_count; i++) {
     conn_fds[i] = get_ipfs_client_socket(conf->servers[i]);
     if (conn_fds[i] == -1) {
-      /*DEBUGSS("Couldn't Connect to Server", conf->servers[i]->name);*/
+      DEBUGSS("Couldn't Connect to Server", conf->servers[i]->name);
       continue;
     }
     connection_flag = true;
-    /*DEBUGSS("Connected to Server", conf->servers[i]->name);*/
+    DEBUGSS("Connected to Server", conf->servers[i]->name);
   }
 
   return connection_flag;
@@ -79,7 +78,7 @@ int get_ipfs_client_socket(ipfs_client_server_struct* server)
     perror("Connection Failed");
     return -1;
   }
-  //DEBUGSS("Connected to Server", server->name);
+  DEBUGSS("Connected to Server", server->name);
   return sockfd;
 }
 
@@ -305,17 +304,17 @@ void send_file_splits(int socket, file_split_struct* file_split, int mod, int se
   int file_piece, i;
   split_struct* split;
 
-  /*DEBUGSN("Server Idx", server_idx);*/
+  DEBUGSN("Server Idx", server_idx);
   for (i = 0; i < CHUNKS_PER_SERVER; i++) {
     memset(payload_buffer, 0, sizeof(payload_buffer));
     file_piece = file_pieces_mapping[mod][server_idx][i];
-    /*DEBUGSN("Uploading to Server", server_idx + 1);*/
-    /*DEBUGSN("Uploading piece", file_piece);*/
+    DEBUGSN("Uploading to Server", server_idx + 1);*/
+    DEBUGSN("Uploading piece", file_piece);*/
     split = file_split->splits[file_piece - 1];
     assert(split->id == file_piece);
-    /*DEBUGS("Split Hash_Value");*/
-    /*print_hash_value(split->content, split->content_length);*/
-    /*DEBUGSN("Split Content Length", split->content_length);*/
+    DEBUGS("Split Hash_Value");*/
+    print_hash_value(split->content, split->content_length);
+    DEBUGSN("Split Content Length", split->content_length);
     write_split_to_socket_as_stream(socket, split);
   }
 }
@@ -339,10 +338,10 @@ int fetch_remote_file_info(int* conn_fds, int conn_count, server_chunks_collate_
     // Receive the size of packet form server
     recv_int_value_socket(conn_fds[i], &payload_size);
 
-    /*if (payload_size == -1) {*/
-    /*DEBUGS("Error in fetching remote file info");*/
-    /*fetch_and_print_error(conn_fds[i]);*/
-    /*}*/
+    if (payload_size == -1) {
+    DEBUGS("Error in fetching remote file info");
+    fetch_and_print_error(conn_fds[i]);
+    }
     if ((payload = (u_char*)malloc(sizeof(u_char) * payload_size)) == NULL) {
       DEBUGSS("Failed to malloc", strerror(errno));
     }
@@ -384,13 +383,13 @@ void fetch_remote_splits(int* conn_fds, int conn_count, file_split_struct* file_
   bool flag;
   u_char proceed_sig = (u_char)PROCEED_SIG;
 
-  //DEBUGS("Fetching Remote Split");
+  DEBUGS("Fetching Remote Split");
   for (i = 0; i < conn_count; i++) {
     flag = false;
     socket = conn_fds[i];
     server = i + 1;
     if (socket == -1) {
-      //DEBUGSN("Server is down", i + 1);
+      DEBUGSN("Server is down", i + 1);
       server = (i != 0) ? i : conn_count;
       socket = conn_fds[(i != 0) ? (i - 1) : conn_count - 1];
       flag = (i == 0) ? true : false;
@@ -400,7 +399,7 @@ void fetch_remote_splits(int* conn_fds, int conn_count, file_split_struct* file_
       }
     }
     split_id = file_pieces_mapping[mod][i][0];
-    /*fprintf(stderr, "Fetching split: %d from Server: %d\n", split_id, server);*/
+    fprintf(stderr, "Fetching split: %d from Server: %d\n", split_id, server);
     send_int_value_socket(socket, split_id);
 
     file_split->split_count++;
@@ -474,7 +473,7 @@ void ipfs_client_command_exec(int* conn_fds, char* buffer_to_send, int conn_coun
     if (mod < 0) {
       return;
     }
-    /*print_server_chunks_collate_struct(&server_chunks_collate);*/
+    print_server_chunks_collate_struct(&server_chunks_collate);
 
     DEBUGS("Checking whether the file is complete");
     if (!check_complete((&server_chunks_collate)->chunks[0])) {
@@ -503,7 +502,7 @@ void ipfs_client_command_exec(int* conn_fds, char* buffer_to_send, int conn_coun
       // Combine the files on local path
       // Handles the case where file_split weren't written successfully given folder doesn't exist
       combine_file_from_pieces(attr, &file_split);
-      /*print_file_split_struct(&file_split);*/
+      print_file_split_struct(&file_split);
       free_file_split_struct(&file_split);
     }
 
@@ -701,7 +700,7 @@ bool split_file_to_pieces(char* file_path, file_split_struct* file_split, int n)
   file_split->file_name = strdup(file_path);
 
   file_size = (long long)sb.st_size;
-  //DEBUGSN("File Size read", (int)file_size);
+  DEBUGSN("File Size read", (int)file_size);
 
   split_size = file_size / n; // First n - 1 splits will have split_size number of bytes
   rem_size = file_size % n;   // Last nth split will have split_size + rem_size number of bytes
@@ -753,8 +752,8 @@ void print_ipfs_client_conf_struct(ipfs_client_conf_struct* conf)
 {
   int i;
   ipfs_client_server_struct* ptr;
-  //DEBUGSS("Username", conf->user->username);
-  //DEBUGSS("Password", conf->user->password);
+  DEBUGSS("Username", conf->user->username);
+  DEBUGSS("Password", conf->user->password);
   for (i = 0; i < conf->server_count; i++) {
     ptr = conf->servers[i];
     fprintf(stderr, "DEBUG: Name:%s Address:%s Port:%d\n", ptr->name, ptr->address, ptr->port);
