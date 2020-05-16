@@ -64,10 +64,6 @@ bool ipfs_command_decode_and_auth(char *buffer, const char *format, ipfs_recv_co
   {
     memset(recv_cmd->file_name, 0, sizeof(recv_cmd->file_name));
   }
-  DEBUGSS("Username", user->username);
-  DEBUGSS("Password", user->password);
-  DEBUGSS("Folder", recv_cmd->folder);
-  DEBUGSS("Filename", recv_cmd->file_name);
 
   return auth_ipfs_user(user, conf);
 }
@@ -140,8 +136,6 @@ void ipfs_command_accept(int socket, ipfs_conf_struct *conf)
 
   free(ipfs_recv_command.user.username);
   free(ipfs_recv_command.user.password);
-
-  DEBUGS("Command Execution Done");
 }
 
 void send_error_helper(int socket, const char *message)
@@ -277,7 +271,6 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
     // Handle case when file doesn't exists
     file_flag = get_files_in_folder(folder_path, &server_chunks_info, recv_cmd->file_name);
-    print_server_chunks_info_struct(&server_chunks_info);
     if (!file_flag)
     {
       DEBUGS("File doesn't exist and sending back error message");
@@ -285,7 +278,6 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
       send_error(socket, FILE_NOT_FOUND);
       return false;
     }
-    print_server_chunks_info_struct(&server_chunks_info);
     // Estimate the size of payload to send
     size_of_payload = INT_SIZE + server_chunks_info.chunks * CHUNK_INFO_STRUCT_SIZE;
 
@@ -321,14 +313,13 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
         // Recv the split id to send
         recv_int_value_socket(socket, &split_id);
-        DEBUGSN("Split #", split_id);
+        //DEBUGSN("Split #", split_id);
 
         sprintf(folder_path + len, ".%s.%d", recv_cmd->file_name, split_id);
-        DEBUGSS("Reading split from path", folder_path);
+        //DEBUGSS("Reading split from path", folder_path);
 
         splits->id = split_id;
         read_into_split_from_file(folder_path, &splits[0]);
-        print_split_struct(splits);
         write_split_to_socket_as_stream(socket, splits);
         recv_signal(socket, &signal);
 
@@ -370,7 +361,6 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
   {
 
     // Check if parent directory exits before proceeding
-
     if (folder_path_flag)
     {
       DEBUGS("Folder path already exists");
@@ -393,11 +383,9 @@ bool auth_ipfs_user(user_struct *user, ipfs_conf_struct *conf)
   {
     if (compare_user_struct(user, conf->users[i]))
     {
-      DEBUGSS("auth_ipfs_user: Authenticated", user->username);
       return true;
     }
   }
-  DEBUGSS("Couldn't Authenticate", user->username);
   return false;
 }
 
