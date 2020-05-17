@@ -1,6 +1,6 @@
 #include "ipfs_server_utils.h"
 
-int get_ipfs_socket(int port_number)
+int get_ipfs_server_socket(int port_number)
 {
 
   int sockfd;
@@ -40,7 +40,7 @@ int get_ipfs_socket(int port_number)
 
   return sockfd;
 }
-bool ipfs_command_decode_and_auth(char *buffer, const char *format, ipfs_recv_command_struct *recv_cmd, ipfs_conf_struct *conf)
+bool ipfs_server_command_decode_and_auth(char *buffer, const char *format, ipfs_server_recv_command_struct *recv_cmd, ipfs_server_conf_struct *conf)
 {
   // All folder ends with '/'
   // saving values needed to evaluate command
@@ -64,32 +64,36 @@ bool ipfs_command_decode_and_auth(char *buffer, const char *format, ipfs_recv_co
   {
     memset(recv_cmd->file_name, 0, sizeof(recv_cmd->file_name));
   }
+  //DEBUGSS("Username", user->username);
+  //DEBUGSS("Password", user->password);
+  //DEBUGSS("Folder", recv_cmd->folder);
+  //DEBUGSS("Filename", recv_cmd->file_name);
 
-  return auth_ipfs_user(user, conf);
+  return auth_ipfs_server_user(user, conf);
 }
 
-void ipfs_command_accept(int socket, ipfs_conf_struct *conf)
+void ipfs_server_command_accept(int socket, ipfs_server_conf_struct *conf)
 {
   char buffer[MAX_SEG_SIZE], temp_buffer[MAX_SEG_SIZE];
   bool auth_flag;
   int flag, command_size;
   user_struct *user;
-  ipfs_recv_command_struct ipfs_recv_command;
+  ipfs_server_recv_command_struct ipfs_server_recv_command;
 
   memset(buffer, 0, sizeof(buffer));
   memset(temp_buffer, 0, sizeof(temp_buffer));
-  memset(&ipfs_recv_command, 0, sizeof(ipfs_recv_command));
+  memset(&ipfs_server_recv_command, 0, sizeof(ipfs_server_recv_command));
 
-  if ((ipfs_recv_command.user.username = (char *)malloc(MAXCHARBUFF * sizeof(char))) == NULL)
+  if ((ipfs_server_recv_command.user.username = (char *)malloc(MAXCHARBUFF * sizeof(char))) == NULL)
   {
     DEBUGSS("Failed to malloc", strerror(errno));
   }
-  if ((ipfs_recv_command.user.password = (char *)malloc(MAXCHARBUFF * sizeof(char))) == NULL)
+  if ((ipfs_server_recv_command.user.password = (char *)malloc(MAXCHARBUFF * sizeof(char))) == NULL)
   {
     DEBUGSS("Failed to malloc", strerror(errno));
   }
 
-  user = &ipfs_recv_command.user;
+  user = &ipfs_server_recv_command.user;
 
   // receiving the command
   // Receiving size of command followd by command
@@ -97,33 +101,33 @@ void ipfs_command_accept(int socket, ipfs_conf_struct *conf)
   recv_from_socket(socket, buffer, command_size);
 
   // Received buffer ends with '\n' to assist easy split
-  sscanf(buffer, GENERIC_TEMPATE, &ipfs_recv_command.flag, temp_buffer);
-  flag = ipfs_recv_command.flag;
+  sscanf(buffer, GENERIC_TEMPATE, &ipfs_server_recv_command.flag, temp_buffer);
+  flag = ipfs_server_recv_command.flag;
 
   DEBUGS("Decoding and authentication command");
   // Handle case when Authentication Fails
   if (flag == LIST_FLAG)
   {
     DEBUGS("Command Received is LIST");
-    auth_flag = ipfs_command_decode_and_auth(buffer, LIST_TEMPLATE, &ipfs_recv_command, conf);
+    auth_flag = ipfs_server_command_decode_and_auth(buffer, LIST_TEMPLATE, &ipfs_server_recv_command, conf);
   }
   else if (flag == GET_FLAG)
   {
 
     DEBUGS("Command Received is GET");
-    auth_flag = ipfs_command_decode_and_auth(buffer, GET_TEMPLATE, &ipfs_recv_command, conf);
+    auth_flag = ipfs_server_command_decode_and_auth(buffer, GET_TEMPLATE, &ipfs_server_recv_command, conf);
   }
   else if (flag == PUT_FLAG)
   {
 
     DEBUGS("Command Received is PUT");
-    auth_flag = ipfs_command_decode_and_auth(buffer, PUT_TEMPLATE, &ipfs_recv_command, conf);
+    auth_flag = ipfs_server_command_decode_and_auth(buffer, PUT_TEMPLATE, &ipfs_server_recv_command, conf);
   }
   else if (flag == MKDIR_FLAG)
   {
 
     DEBUGS("Command Received is MKDIR");
-    auth_flag = ipfs_command_decode_and_auth(buffer, MKDIR_TEMPLATE, &ipfs_recv_command, conf);
+    auth_flag = ipfs_server_command_decode_and_auth(buffer, MKDIR_TEMPLATE, &ipfs_server_recv_command, conf);
   }
 
   if (!auth_flag)
@@ -132,10 +136,12 @@ void ipfs_command_accept(int socket, ipfs_conf_struct *conf)
     send_error(socket, AUTH_FAILED);
   }
   else
-    ipfs_command_exec(socket, &ipfs_recv_command, conf, flag);
+    ipfs_server_command_exec(socket, &ipfs_server_recv_command, conf, flag);
 
-  free(ipfs_recv_command.user.username);
-  free(ipfs_recv_command.user.password);
+  free(ipfs_server_recv_command.user.username);
+  free(ipfs_server_recv_command.user.password);
+
+  //DEBUGS("Command Execution Done");
 }
 
 void send_error_helper(int socket, const char *message)
@@ -180,7 +186,7 @@ void send_error(int socket, int flag)
   }
 }
 
-bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf_struct *conf, int flag)
+bool ipfs_server_command_exec(int socket, ipfs_server_recv_command_struct *recv_cmd, ipfs_server_conf_struct *conf, int flag)
 {
   // Executes the received command
   char folder_path[2 * MAXCHARBUFF], signal;
@@ -200,7 +206,7 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
   if (!check_directory_exists(folder_path))
   {
     DEBUGSS("Creating user directory:", folder_path);
-    create_ipfs_directory(folder_path);
+    create_ipfs_server_directory(folder_path);
   }
 
   // Since recv_cmd->folder ends with a '/' no need to add it in format
@@ -271,6 +277,7 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
     // Handle case when file doesn't exists
     file_flag = get_files_in_folder(folder_path, &server_chunks_info, recv_cmd->file_name);
+    /*print_server_chunks_info_struct(&server_chunks_info);*/
     if (!file_flag)
     {
       DEBUGS("File doesn't exist and sending back error message");
@@ -278,6 +285,7 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
       send_error(socket, FILE_NOT_FOUND);
       return false;
     }
+    /*print_server_chunks_info_struct(&server_chunks_info);*/
     // Estimate the size of payload to send
     size_of_payload = INT_SIZE + server_chunks_info.chunks * CHUNK_INFO_STRUCT_SIZE;
 
@@ -320,6 +328,7 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
 
         splits->id = split_id;
         read_into_split_from_file(folder_path, &splits[0]);
+        /*print_split_struct(splits);*/
         write_split_to_socket_as_stream(socket, splits);
         recv_signal(socket, &signal);
 
@@ -361,6 +370,7 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
   {
 
     // Check if parent directory exits before proceeding
+
     if (folder_path_flag)
     {
       DEBUGS("Folder path already exists");
@@ -370,33 +380,35 @@ bool ipfs_command_exec(int socket, ipfs_recv_command_struct *recv_cmd, ipfs_conf
     }
     send_int_value_socket(socket, 1);
     DEBUGS("Creating director");
-    create_ipfs_directory(folder_path);
+    create_ipfs_server_directory(folder_path);
   }
 
   return true;
 }
 
-bool auth_ipfs_user(user_struct *user, ipfs_conf_struct *conf)
+bool auth_ipfs_server_user(user_struct *user, ipfs_server_conf_struct *conf)
 {
   int i;
   for (i = 0; i < conf->user_count; i++)
   {
     if (compare_user_struct(user, conf->users[i]))
     {
+      //DEBUGSS("auth_ipfs_server_user: Authenticated", user->username);
       return true;
     }
   }
+  //DEBUGSS("Couldn't Authenticate", user->username);
   return false;
 }
 
-void read_ipfs_conf(char *file_path, ipfs_conf_struct *conf)
+void read_ipfs_server_conf(char *file_path, ipfs_server_conf_struct *conf)
 {
   FILE *fp;
   char line[MAXFILEBUFF];
   int line_len;
   if ((fp = fopen(file_path, "r")) <= 0)
   {
-    perror("IPFS_Client => Error in opening config file: ");
+    perror("IPFSC => Error in opening config file: ");
   }
 
   while (fgets(line, sizeof(line), fp))
@@ -404,11 +416,11 @@ void read_ipfs_conf(char *file_path, ipfs_conf_struct *conf)
     // Assumption that entire line can fix in this buffer
     line_len = strlen(line);
     line[line_len - 1] = (line[line_len - 1] == NEW_LINE_CHAR) ? NULL_CHAR : line[line_len - 1];
-    insert_ipfs_user_conf(line, conf);
+    insert_ipfs_server_user_conf(line, conf);
   }
 }
 
-void insert_ipfs_user_conf(char *line, ipfs_conf_struct *conf)
+void insert_ipfs_server_user_conf(char *line, ipfs_server_conf_struct *conf)
 {
   char *ptr;
   int len, i;
@@ -421,7 +433,7 @@ void insert_ipfs_user_conf(char *line, ipfs_conf_struct *conf)
   conf->users[i]->password = strdup(ptr);
 }
 
-void create_ipfs_directory(char *path)
+void create_ipfs_server_directory(char *path)
 {
   struct stat st;
 
@@ -430,22 +442,22 @@ void create_ipfs_directory(char *path)
 }
 
 // Creates directory for all the servers with sub directory for each of the user
-void ipfs_directory_creator(char *server_name, ipfs_conf_struct *conf)
+void ipfs_server_directory_creator(char *server_name, ipfs_server_conf_struct *conf)
 {
   int i;
   char file_path[MAXFILEBUFF];
   user_struct *user;
-  create_ipfs_directory(server_name);
+  create_ipfs_server_directory(server_name);
   for (i = 0; i < conf->user_count; i++)
   {
     user = conf->users[i];
     memset(file_path, 0, sizeof(file_path));
     sprintf(file_path, "%s/%s", server_name, user->username);
-    create_ipfs_directory(file_path);
+    create_ipfs_server_directory(file_path);
   }
 }
 
-void print_ipfs_conf_struct(ipfs_conf_struct *conf)
+void print_ipfs_server_conf_struct(ipfs_server_conf_struct *conf)
 {
   int i;
   user_struct *ptr;
@@ -456,7 +468,7 @@ void print_ipfs_conf_struct(ipfs_conf_struct *conf)
   }
 }
 
-void free_ipfs_conf_struct(ipfs_conf_struct *conf)
+void free_ipfs_server_conf_struct(ipfs_server_conf_struct *conf)
 {
   int i;
   i = conf->user_count;
