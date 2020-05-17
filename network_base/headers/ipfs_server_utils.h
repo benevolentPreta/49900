@@ -19,7 +19,8 @@
 #define FOLDER_EXISTS_ERROR "Requested folder already exists on server"
 #define FILE_NOT_FOUND_ERROR "Requested file does not exists on server"
 #define AUTH_FAILED_ERROR "Invalid Username/Password. Please try again"
-enum IPFSConstants {
+enum IPFSSConstants
+{
   MAXUSERS = 10,
   MAXCONNECTION = 10,
   FOLDER_NOT_FOUND = 1,
@@ -28,30 +29,32 @@ enum IPFSConstants {
   AUTH_FAILED = 4
 };
 
-typedef struct ipfs_conf_struct {
+typedef struct ipfs_server_conf_struct
+{
   char server_name[MAXCHARBUFF];
-  user_struct* users[MAXUSERS];
+  user_struct *users[MAXUSERS];
   int user_count;
-} ipfs_conf_struct;
+} ipfs_server_conf_struct;
 
-typedef struct ipfs_recv_command_struct {
+typedef struct ipfs_server_recv_command_struct
+{
   int flag;
   user_struct user;
   char folder[MAXCHARBUFF]; // Folder always ends with "/" and doesn't begin with one
   char file_name[MAXCHARBUFF];
-} ipfs_recv_command_struct;
+} ipfs_server_recv_command_struct;
 
-int get_ipfs_socket(int);
-bool auth_ipfs_user(user_struct*, ipfs_conf_struct*);
-void send_error_helper(int, const char*);
+int get_ipfs_server_socket(int);
+bool auth_ipfs_server_user(user_struct *, ipfs_server_conf_struct *);
+void send_error_helper(int, const char *);
 void send_error(int, int);
-void read_ipfs_conf(char*, ipfs_conf_struct*);
-void insert_ipfs_user_conf(char*, ipfs_conf_struct*);
-void ipfs_command_accept(int, ipfs_conf_struct*);
-bool ipfs_command_decode_and_auth(char*, const char*, ipfs_recv_command_struct*, ipfs_conf_struct*);
-bool ipfs_command_exec(int, ipfs_recv_command_struct*, ipfs_conf_struct*, int);
-void create_ipfs_directory(char*);
-void ipfs_directory_creator(char*, ipfs_conf_struct*);
-void print_ipfs_conf_struct(ipfs_conf_struct*);
-void free_ipfs_conf_struct(ipfs_conf_struct*);
+void read_ipfs_server_conf(char *, ipfs_server_conf_struct *);
+void insert_ipfs_server_user_conf(char *, ipfs_server_conf_struct *);
+void ipfs_server_command_accept(int, ipfs_server_conf_struct *);
+bool ipfs_server_command_decode_and_auth(char *, const char *, ipfs_server_recv_command_struct *, ipfs_server_conf_struct *);
+bool ipfs_server_command_exec(int, ipfs_server_recv_command_struct *, ipfs_server_conf_struct *, int);
+void create_ipfs_server_directory(char *);
+void ipfs_server_directory_creator(char *, ipfs_server_conf_struct *);
+void print_ipfs_server_conf_struct(ipfs_server_conf_struct *);
+void free_ipfs_server_conf_struct(ipfs_server_conf_struct *);
 #endif

@@ -1,17 +1,18 @@
 #include "ipfs_server_utils.h"
 #include <sys/types.h>
 #include <sys/wait.h>
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
   pid_t pid;
-  ipfs_conf_struct conf;
+  ipfs_server_conf_struct conf;
   char *server_folder, *file_name = "conf/ipfs_server.conf";
   int port_number, listen_fd, conn_fd, status;
   struct sockaddr_in remote_address;
   socklen_t addr_size = sizeof(struct sockaddr_in);
   mkzero(conf);
   mkzero(conf.users);
-  if (argc != 3) {
+  if (argc != 3)
+  {
     fprintf(stderr, "USAGE: ipfs_server <folder> <port>\n");
     exit(1);
   }
@@ -19,29 +20,37 @@ int main(int argc, char** argv)
   server_folder = argv[1];
   port_number = atoi(argv[2]);
 
-  read_ipfs_conf(file_name, &conf);
+  read_ipfs_server_conf(file_name, &conf);
   strcpy(conf.server_name, server_folder + 1);
-  listen_fd = get_ipfs_socket(port_number);
+  // Assumption that server_folder begins with a /
+  /*ipfs_server_directory_creator(++server_folder, &conf);*/
 
-  while (true) {
+  listen_fd = get_ipfs_server_socket(port_number);
+
+  while (true)
+  {
     DEBUGSS("Waiting to Accept Connection", server_folder);
-    if ((conn_fd = accept(listen_fd, (struct sockaddr*)&remote_address, &addr_size)) <= 0) {
+    if ((conn_fd = accept(listen_fd, (struct sockaddr *)&remote_address, &addr_size)) <= 0)
+    {
       perror("Error Accepting Connection");
       continue;
     }
 
     pid = fork();
-    if (pid != 0) {
+    if (pid != 0)
+    {
       close(conn_fd);
       waitpid(-1, &status, WNOHANG);
-    } else {
+    }
+    else
+    {
       DEBUGSN("In Child process", getpid());
-      ipfs_command_accept(conn_fd, &conf);
+      ipfs_server_command_accept(conn_fd, &conf);
       close(conn_fd);
       break;
     }
     DEBUGS("Closed Connection, waiting to accept next");
   }
-  free_ipfs_conf_struct(&conf);
+  free_ipfs_server_conf_struct(&conf);
   return 0;
 }

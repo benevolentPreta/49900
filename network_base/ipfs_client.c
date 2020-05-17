@@ -17,6 +17,7 @@ int main(int argc, char **argv)
   }
   conf_file = argv[1];
   read_ipfs_client_conf(conf_file, &conf);
+  /*print_ipfs_client_conf_struct(&conf);*/
 
   while (true)
   {
@@ -28,12 +29,16 @@ int main(int argc, char **argv)
     fprintf(stdout, ">>> ");
     fgets(buffer, MAXFILEBUFF, stdin);
     buffer_size = strlen(buffer);
+
+    /*DEBUGS("Setting up connections with remote servers");*/
+    /*setup_ipfs_client_to_ipfs_server_connections(&conn_fds, &conf);*/
+
     conn_fds = (int *)malloc(conf.server_count * sizeof(int));
-    
     if (buffer[buffer_size - 1] == NEW_LINE_CHAR)
       buffer[--buffer_size] = NULL_CHAR;
 
     // Assumption is that folders always end with '/' and file names are absolute
+
     if ((char_ptr = get_sub_string_after(buffer, IPFSC_LIST_CMD)))
     {
 
