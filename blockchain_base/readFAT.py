@@ -3,7 +3,7 @@ from blockchain import Blockchain
 
 local_blockchain = Blockchain()
 
-
+# Note 'fat.txt' must be located in the same directory as readFAT.py
 def add_block_from_file():
     with open('fat.txt', 'r') as FAT:
         data = FAT.read()
